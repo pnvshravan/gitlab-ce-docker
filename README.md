@@ -3,7 +3,7 @@
 - Inspired by [hutchgrant](https://github.com/hutchgrant)'s Github repository -> [gitlab-docker-local](https://github.com/hutchgrant/gitlab-docker-local).
 
 **Objective:**
-- Setup Gitlab Community Edition using Docker Compose on your local machine along with a custom SSL certificate (`mkcert` CA). 
+- Setup [Gitlab Community Edition](https://gitlab.com/rluna-gitlab/gitlab-ce) using Docker Compose on your local machine along with a custom SSL certificate (using [`mkcert`](https://github.com/FiloSottile/mkcert) Certificate Authority (CA)). 
 
 ---
 ### Terminologies:-
@@ -110,7 +110,8 @@ networks:
   gitlab-network:
     external: true
 ```
-Note:
+
+**Note:**
 > The GitLab runner mounts your repo to `/builds/...` inside the Docker container running the pipeline.
 > The DinD service `(docker:dind)` doesn't know about your runner mounts unless you explicitly reference them.
 
@@ -381,12 +382,12 @@ sudo systemctl disable nginx
 ```
 
 **Note:**
-- **Port 443 must be free** on your host system. If anything else (like Apache, nginx, or another service) is using 443, Docker will fail to start the GitLab container.
-- You may need **sudo/root** to bind to privileged ports like 443.
-- If you’re running this on macOS or Windows with Docker Desktop, binding to 443 is usually okay as long as it's not in use.
+> **Port 443 must be free** on your host system. If anything else (like Apache, nginx, or another service) is using 443, Docker will fail to start the GitLab container.
+> You may need **sudo/root** to bind to privileged ports like 443.
+> If you’re running this on macOS or Windows with Docker Desktop, binding to 443 is usually okay as long as it's not in use.
 
 ---
-## Q&A ❔❕:
+## Q&A ❔❕
 ### 1. Use of `extra_hosts` in `docker_compose.yml` ?
 - Let’s break down **why** you'd add a DNS entry like this in your `docker-compose.yml` using `extra_hosts`:
 
@@ -428,7 +429,8 @@ So using `extra_hosts` lets you:
 - While still ensuring the container can resolve that hostname to the correct **IP address**.
 
 ---
-## References:
+## References & Links:
+- Install self-managed GitLab: https://about.gitlab.com/install/
 - Register a runner in Docker: https://docs.gitlab.com/runner/register/?tab=Docker
 - Configure SSL for a Linux package installation: https://docs.gitlab.com/omnibus/settings/ssl/#configure-https-manually
 - Self-signed certificates or custom Certification Authorities: https://docs.gitlab.com/runner/configuration/tls-self-signed/
