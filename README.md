@@ -1,6 +1,6 @@
 # gitlab-ce-docker
 
-- Inspired by [hutchgrant](https://github.com/hutchgrant)'s Github [repository](https://github.com/hutchgrant/gitlab-docker-local).
+- Inspired by [hutchgrant](https://github.com/hutchgrant)'s Github repository -> [gitlab-docker-local](https://github.com/hutchgrant/gitlab-docker-local).
 
 ---
 ### Terminologies:-
@@ -201,7 +201,7 @@ docker logs -f "$container"
 
 - To verify if mkcert is installed properly on your machine, run this command on your terminal -
 `mkcert -CAROOT` , and should show the directory where its got installed like below:
-![](mkcert_img_1.png)
+![](images/mkcert_img_1.png)
 
 5.  Run the `setup_gitlab_ssl.sh` bash script on your terminal with command for the first time:
 `sh setup_gitlab_ssl.sh`
@@ -266,18 +266,132 @@ docker exec -it gitlab-runner-ssl gitlab-runner register \
 > Otherwise `DinD` won’t fully start properly (which matches your logs like: `mount: permission denied (are you root?)` and failing health checks).
 
 3. After running the Step-2, there is a need to change some lines in the config.toml wrt runner, look for `volumes` under [runners. docker], where you will find `volumes = ["/cache"]`, and this line should be replaced with `volumes = ["/cache", "/etc/gitlab-runner/certs:/usr/local/share/ca-certificates:ro"]` and can be seen in below image:
-![](runner_example.png)
+![](images/runner_example.png)
 
 
 
 ---
-### Errors encountered:
+## Errors encountered:
 
 1. Error while deleting a project created in root.
-![](error_1.png)
 
-### ✅ Solution: Trust the mkcert Root CA **inside the GitLab container**
+![](images/error_1.png)
+
+✅ **Solution: Trust the mkcert Root CA inside the GitLab container**
+Thanks! That output pinpoints the problem perfectly: **GitLab container doesn't trust your mkcert-generated root CA** yet — so it can't verify the registry certificate.
+
+1. 🔧 Fix: Explicitly trust mkcert’s root CA
+
+You already mounted the mkcert CA to `/usr/local/share/ca-certificates/mkcert-rootCA.crt`, but that isn’t enough until it’s processed into system certs.
+
+🛠️ Step-by-step inside the GitLab container:
+
+```bash
+docker exec -it gitlab-local-server-ssl bash
+```
+
+- Then run:
+
+```bash
+# Copy CA into trust directory (should already be there from volume)
+cp /usr/local/share/ca-certificates/mkcert-rootCA.crt /usr/local/share/ca-certificates/mkcert-rootCA.crt
+
+# Update trusted certs
+update-ca-certificates
+
+# Double-check that it was added
+ls -l /etc/ssl/certs/ | grep mkcert
+```
+
+You should see something like:
+```
+lrwxrwxrwx 1 root root    45 Apr 10 12:00 mkcert-rootCA.pem -> /usr/share/ca-certificates/mkcert-rootCA.crt
+```
+
+
+2. Now verify again:
+
+```bash
+openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /etc/gitlab/ssl/gitlab-server.local.crt
+```
+
+**Expected Output:**
+```
+/etc/gitlab/ssl/gitlab-server.local.crt: OK
+```
+
+3. 🔁 Final important step: Make Ruby inside GitLab trust this
+
+Still in the same container:
+
+```bash
+cp /etc/ssl/certs/ca-certificates.crt /opt/gitlab/embedded/ssl/certs/cacert.pem
+```
+
+This ensures GitLab services like the registry client and Rails app trust the mkcert CA.
+
+
+4. 🔄 Then restart GitLab:
+
+```bash
+gitlab-ctl reconfigure
+gitlab-ctl restart
+```
+
+Once it comes back up, retry the curl check:
+
+```bash
+curl -vk https://gitlab-server.local:9000/v2/
+```
+**Expected Output:**
+✅ A `401 Unauthorized` means it’s working perfectly (registry is up and using SSL).
+
+- These steps have been included in `setup_gitalb_ssl.sh` file as part of automation.
 
 ---
-### References:
+## Q&A ❔❕:
+#### 1. Use of `extra_hosts` in `docker_compose.yml` ?
+- Let’s break down **why** you'd add a DNS entry like this in your `docker-compose.yml` using `extra_hosts`:
+
+❓❗ **Problem:**
+Inside a **Docker container**, hostname resolution doesn’t always work as expected — especially if:
+- You’re using a **custom hostname** like `gitlab-server`.
+- You're trying to access **another container** (like GitLab) by that name **from a different Docker network** (e.g., the GitLab Runner container).
+- Or, your hostname (`gitlab-server`) is **not a real DNS entry**, and mkcert has generated a cert for it.
+
+So when Git tries to clone a repo from `https://gitlab-server:443/...` inside the GitLab Runner container, it doesn’t know where `gitlab-server` is — leading to errors like `Could not connect to server`.
+
+
+✅ **Solution:**
+You tell Docker **explicitly**:  
+> “Hey, when you see `gitlab-server`, treat it as IP `172.x.x.x`.”
+
+You do this by adding:
+```yaml
+gitlab-runner:
+  ...
+  extra_hosts:
+    - "gitlab-server:172.20.0.2"
+```
+
+> 🔍 This is the same as editing `/etc/hosts` inside the container:  
+> `172.20.0.2 gitlab-server`
+
+Now:
+- When Git in the runner tries to resolve `gitlab-server`, it goes directly to the correct IP.
+- The SSL cert still works because it was issued to `gitlab-server` (not the IP).
+- No DNS lookup fails. No SSL mismatch.
+
+🔁 **Why not just use the IP?**
+
+Because the SSL certificate **was issued for the hostname** `gitlab-server` by mkcert. If you try to access by IP (`https://172.20.0.2:443`), SSL validation **fails** due to mismatched hostname.
+
+So using `extra_hosts` lets you:
+- Stick with the correct **SSL hostname**,
+- While still ensuring the container can resolve that hostname to the correct **IP address**.
+
+---
+## References:
 - Register a runner in Docker: https://docs.gitlab.com/runner/register/?tab=Docker
+- Configure SSL for a Linux package installation: https://docs.gitlab.com/omnibus/settings/ssl/#configure-https-manually
+- Self-signed certificates or custom Certification Authorities: https://docs.gitlab.com/runner/configuration/tls-self-signed/
