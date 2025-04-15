@@ -350,7 +350,7 @@ curl -vk https://gitlab-server.local:9000/v2/
 
 ---
 ## Q&A ❔❕:
-#### 1. Use of `extra_hosts` in `docker_compose.yml` ?
+### 1. Use of `extra_hosts` in `docker_compose.yml` ?
 - Let’s break down **why** you'd add a DNS entry like this in your `docker-compose.yml` using `extra_hosts`:
 
 ❓❗ **Problem:**
