@@ -1,0 +1,90 @@
+services:
+  gitlab-server:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab-local-server-ssl
+    hostname: gitlab-server
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://gitlab-server'
+
+        # Disable Let's Encrypt
+        letsencrypt['enable'] = false
+
+        # GitLab NGINX Config
+        nginx['listen_https'] = true
+        nginx['listen_port'] = 443
+        nginx['hsts_max_age'] = 0
+        nginx['ssl_certificate'] = "/etc/gitlab/ssl/gitlab-server.crt"
+        nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/gitlab-server.key"
+        nginx['redirect_http_to_https'] = true
+        nginx['ssl_dhparam'] = nil
+
+        gitlab_rails['gitlab_host'] = 'gitlab-server'
+        gitlab_rails['gitlab_port'] = 443
+        gitlab_rails['initial_root_password'] = '?'
+
+        puma['worker_processes'] = 0
+        gitlab_rails['gitlab_shell_ssh_port'] = 8022
+
+        # Registry Settings
+        registry_external_url 'https://gitlab-server:9000'
+        registry['enable'] = true
+        gitlab_rails['registry_enabled'] = true
+        gitlab_rails['registry_host'] = 'gitlab-server'
+        gitlab_rails['registry_port'] = 9000
+        gitlab_rails['registry_api_url'] = 'https://gitlab-server:9000'
+
+        registry_nginx['listen_https'] = true
+        registry_nginx['listen_port'] = 9000
+        registry_nginx['ssl_certificate'] = "/etc/gitlab/ssl/gitlab-server.crt"
+        registry_nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/gitlab-server.key"
+
+    volumes:
+      - ./gitlab/config:/etc/gitlab
+      - ./gitlab/logs:/var/log/gitlab
+      - ./gitlab/data:/var/opt/gitlab
+      - ./gitlab/config/trusted-certs:/etc/gitlab/trusted-certs
+
+      # SSL certs for nginx/registry
+      - ./gitlab/ssl/gitlab-server.crt:/etc/gitlab/ssl/gitlab-server.crt
+      - ./gitlab/ssl/gitlab-server.key:/etc/gitlab/ssl/gitlab-server.key
+
+   
+    ports:
+      - '8500:80'
+      - '443:443'
+      - '9000:9000'
+      - '8022:22'
+
+    healthcheck:
+      test: ["CMD", "curl", "-k", "--fail", "https://localhost/-/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+
+    networks:
+      gitlab-network:
+        aliases:
+          - gitlab-server
+
+  gitlab-runner:
+    image: gitlab/gitlab-runner:alpine
+    container_name: gitlab-runner-ssl
+    privileged: true
+    depends_on:
+      gitlab-server:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./gitlab-runner/config:/etc/gitlab-runner
+      - /builds:/builds
+      - /cache:/cache
+      - ./certs/gitlab/gitlab-server.crt:/etc/gitlab-runner/certs/ca.crt
+    networks:
+      - gitlab-network
+    extra_hosts:
+     - "gitlab-server:172.28.0.2"
+
+networks:
+  gitlab-network:
+    external: true
