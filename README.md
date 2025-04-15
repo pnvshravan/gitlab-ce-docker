@@ -112,8 +112,8 @@ networks:
 ```
 
 **Note:**
-> The GitLab runner mounts your repo to `/builds/...` inside the Docker container running the pipeline.
-> The DinD service `(docker:dind)` doesn't know about your runner mounts unless you explicitly reference them.
+> - The GitLab runner mounts your repo to `/builds/...` inside the Docker container running the pipeline.
+> - The DinD service `(docker:dind)` doesn't know about your runner mounts unless you explicitly reference them.
 
 2. Create a `install_mkcert.sh` file with contents:
 ```
@@ -235,6 +235,7 @@ extra_hosts:
 
 9. Now start up the containers using the command: `docker compose up --build`
 **Note:** Use the `--build` option only when changes are done in configuration. 
+
 Otherwise:
 - To start the containers: `docker compose up` 
 - To stop the containers: `docker compose down`
@@ -261,6 +262,7 @@ docker exec -it gitlab-runner-ssl gitlab-runner register \
 - The **GitLab runner should be running in privileged mode**, which is often required for DinD.
 
 - Make sure your GitLab Runner is configured with privileged mode enabled in `config.toml`:
+
 ```toml
 [[runners]]
   ...
@@ -382,9 +384,11 @@ sudo systemctl disable nginx
 ```
 
 **Note:**
-> **Port 443 must be free** on your host system. If anything else (like Apache, nginx, or another service) is using 443, Docker will fail to start the GitLab container.
-> You may need **sudo/root** to bind to privileged ports like 443.
-> If you’re running this on macOS or Windows with Docker Desktop, binding to 443 is usually okay as long as it's not in use.
+> - **Port 443 must be free** on your host system. If anything else (like Apache, nginx, or another service) is using 443, Docker will fail to start the GitLab container.
+
+> - You may need **sudo/root** to bind to privileged ports like 443.
+
+> - If you’re running this on macOS or Windows with Docker Desktop, binding to 443 is usually okay as long as it's not in use.
 
 ---
 ## Q&A ❔❕
