@@ -2,6 +2,9 @@
 
 - Inspired by [hutchgrant](https://github.com/hutchgrant)'s Github repository -> [gitlab-docker-local](https://github.com/hutchgrant/gitlab-docker-local).
 
+**Objective:**
+- Setup Gitlab Community Edition using Docker Compose on your local machine along with a custom SSL certificate (`mkcert` CA). 
+
 ---
 ### Terminologies:-
 
@@ -347,6 +350,40 @@ curl -vk https://gitlab-server.local:9000/v2/
 ✅ A `401 Unauthorized` means it’s working perfectly (registry is up and using SSL).
 
 - These steps have been included in `setup_gitalb_ssl.sh` file as part of automation.
+---
+
+## Issues that one may encountered:
+
+### 1. Stop Apache server on Ubuntu / Linux-based OS as it can interfere with port config done in `docker-compose.yml`:
+- Verify host OS isn't running Apache, on your host:
+```
+sudo netstat -tuln | grep ':80'
+sudo netstat -tuln | grep ':9000'
+```
+Do you see an Apache running outside of Docker on port 80 or 9000?. If you see something like the below:
+```
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN     
+tcp6       0      0 :::80                   :::*                    LISTEN     
+tcp6       0      0 :::8080                 :::*                    LISTEN     
+tcp        0      0 0.0.0.0:9000            0.0.0.0:*               LISTEN     
+tcp6       0      0 :::9000                 :::*                    LISTEN  
+```
+- Stop or disable the service on your host:
+If it's Apache:
+```
+sudo systemctl stop apache2
+sudo systemctl disable apache2
+```
+If it's nginx:
+```
+sudo systemctl stop nginx
+sudo systemctl disable nginx
+```
+
+**Note:**
+- **Port 443 must be free** on your host system. If anything else (like Apache, nginx, or another service) is using 443, Docker will fail to start the GitLab container.
+- You may need **sudo/root** to bind to privileged ports like 443.
+- If you’re running this on macOS or Windows with Docker Desktop, binding to 443 is usually okay as long as it's not in use.
 
 ---
 ## Q&A ❔❕:
