@@ -355,7 +355,7 @@ curl -vk https://gitlab-server.local:9000/v2/
 - These steps have been included in `setup_gitalb_ssl.sh` file as part of automation.
 ---
 
-## Issues that one may encountered:
+## Issues that one may encounter:
 
 ### 1. Stop Apache server on Ubuntu / Linux-based OS as it can interfere with port config done in `docker-compose.yml`:
 - Verify host OS isn't running Apache, on your host:
